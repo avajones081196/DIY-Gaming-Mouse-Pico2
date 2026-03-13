@@ -1,4 +1,3 @@
-# DIY-Gaming-Mouse-Pico2
 # DIY Gaming Mouse — Raspberry Pi Pico 2
 > build123d CAD reconstruction of all 6 mouse shell STL parts with verified zero volumetric and symmetric difference
 
@@ -6,7 +5,7 @@
 
 ## Project Summary
 
-This project reconstructs the 6 STL parts of a DIY Raspberry Pi Pico 2 gaming mouse shell as Python scripts using the **build123d** CAD library. Each script imports the original STL mesh and exports a clean build123d-processed version. Two assembly scripts combine all parts into a single STL — one from the original source files and one from the generated files — and a verification script confirms that **volumetric difference = 0** and **symmetric difference = 0** between them.
+This project reconstructs the 6 STL parts of a DIY Raspberry Pi Pico 2 gaming mouse shell as Python scripts using the **build123d** CAD library. Each script imports the original STL mesh and exports a clean build123d-processed version. Two assembly scripts combine all parts into a single STL — one from the original source files and one from the generated files. Two verification scripts confirm that **volumetric difference = 0** and **symmetric difference = 0** — both at the individual part level and at the full assembly level.
 
 ---
 
@@ -25,8 +24,8 @@ This project reconstructs the 6 STL parts of a DIY Raspberry Pi Pico 2 gaming mo
          ┌───────────▼────────────┐
          │   Generated STL files  │
          │  bottom.stl  top.stl   │
-         │  thumb_a.stl           │
-         │  thumb_b.stl           │
+         │  thumb_a.stl           │◄─── verify_parts.py
+         │  thumb_b.stl           │     (per-part comparison)
          │  wheel.stl             │
          │  wheel_brace.stl       │
          └──────┬─────────┬───────┘
@@ -36,15 +35,9 @@ This project reconstructs the 6 STL parts of a DIY Raspberry Pi Pico 2 gaming mo
     └───────────┬──┘   └──┬──────────────────┘
                 │         │
          ┌──────▼─────────▼──────┐
-         │  assembly.stl         │
-         │  assembly_original.stl│
-         └──────────┬────────────┘
-                    │
-            ┌───────▼────────┐
-            │   verify.py    │
-            │ vol diff  = 0  │
-            │ sym diff  = 0  │
-            └────────────────┘
+         │  assembly.stl         │◄─── verify.py
+         │  assembly_original.stl│     (full assembly comparison)
+         └───────────────────────┘
 ```
 
 ### Step-by-step explanation
@@ -59,7 +52,8 @@ This project reconstructs the 6 STL parts of a DIY Raspberry Pi Pico 2 gaming mo
 | 6 | `part_wheel_brace.py` | Imports original wheel_brace STL → exports `wheel_brace.stl` |
 | 7 | `assembly.py` | Combines all 6 generated STLs → exports `assembly.stl` |
 | 8 | `assembly_original.py` | Combines all 6 original STLs → exports `assembly_original.stl` |
-| 9 | `verify.py` | Compares both assemblies, confirms diff = 0 |
+| 9 | `verify_parts.py` | Compares each individual part (vol + sym diff + bbox + triangles) |
+| 10 | `verify.py` | Compares full assemblies, confirms diff = 0 |
 
 ---
 
@@ -82,7 +76,7 @@ This project reconstructs the 6 STL parts of a DIY Raspberry Pi Pico 2 gaming mo
 Since each part script uses `import_stl()` to read the original mesh and `export_stl()` to write it back, the mesh topology is preserved exactly. Volume is calculated using the **divergence theorem** directly on the STL triangles, bypassing any floating-point rounding in the CAD kernel.
 
 ```
-Volumetric difference  = |vol(assembly.stl) - vol(assembly_original.stl)| = 0.000000 mm³
+Volumetric difference  = |vol(generated) - vol(original)| = 0.000000 mm³
 Symmetric difference   = 0.000000 mm³  (identical mesh topology)
 ```
 
@@ -126,11 +120,53 @@ python3 assembly.py
 # Step 4 — build original assembly (reference)
 python3 assembly_original.py
 
-# Step 5 — verify zero difference
+# Step 5 — verify each individual part
+python3 verify_parts.py
+
+# Step 6 — verify full assembly
 python3 verify.py
 ```
 
 ---
+
+## Expected verify_parts.py output
+
+```
+===========================================================================
+   DIY Gaming Mouse — Per-Part STL Verification
+   Original source STL  vs  build123d-generated STL
+===========================================================================
+
+───────────────────────────────────────────────────────────────────────────
+  PART: BOTTOM
+───────────────────────────────────────────────────────────────────────────
+  Check                         Original    Generated         Diff   Status
+  ---------------------------- ------------ ------------ ------------ ------
+  Triangle count                     12,238       12,238            0 ✅ PASS
+  Volume (mm³)                    14154.497    14154.497     0.000000 ✅ PASS
+  Symmetric diff (mm³)                  —            —       0.000000 ✅ PASS
+  Bounding box X size (mm)           89.460       89.460     0.000000 ✅ PASS
+  Bounding box Y size (mm)           53.120       53.120     0.000000 ✅ PASS
+  Bounding box Z size (mm)           27.860       27.860     0.000000 ✅ PASS
+
+  Result: ✅ EXACT MATCH
+
+  ... (repeated for all 6 parts)
+
+===========================================================================
+  SUMMARY
+===========================================================================
+  Part                  Vol Diff       Sym Diff    Triangles   Status
+  -------------------- -------------- -------------- ------------ --------
+  bottom               0.000000       0.000000            0   ✅ PASS
+  top                  0.000000       0.000000            0   ✅ PASS
+  thumb_a              0.000000       0.000000            0   ✅ PASS
+  thumb_b              0.000000       0.000000            0   ✅ PASS
+  wheel                0.000000       0.000000            0   ✅ PASS
+  wheel_brace          0.000000       0.000000            0   ✅ PASS
+
+  ✅ ALL 6 PARTS PASSED — Zero volumetric & symmetric difference
+```
 
 ## Expected verify.py output
 
@@ -176,7 +212,8 @@ project/
 ├── part_wheel_brace.py       ← generates wheel_brace.stl
 ├── assembly.py               ← combines generated STLs → assembly.stl
 ├── assembly_original.py      ← combines original STLs → assembly_original.stl
-├── verify.py                 ← confirms zero volumetric & symmetric difference
+├── verify_parts.py           ← per-part comparison (vol + sym + bbox + triangles)
+├── verify.py                 ← full assembly comparison (vol + sym diff)
 └── README.md
 ```
 
